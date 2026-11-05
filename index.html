@@ -1695,6 +1695,16 @@ function slotTap(side){
   if(S.turn!==0||S.over||S.locked||SCH)return;
   const m=moveFor(S.pending,side);if(m)playSoon(m);
 }
+/* Punta donde cae la ficha arrastrada: la válida más cercana al centro de la ficha que se ve.
+   Dentro de la mesa siempre cuenta; fuera de ella, si quedó a menos de 90 px de una punta. */
+function dropTarget(t,x,y){
+  const slots=[...document.querySelectorAll('#r-board .slot')].filter(el=>moveFor(t,el.dataset.side));if(!slots.length)return null;
+  const cx=x,cy=y-24;let best=null,bd=1e9;
+  for(const el of slots){const r=el.getBoundingClientRect(),dx=Math.max(r.left-cx,0,cx-r.right),dy=Math.max(r.top-cy,0,cy-r.bottom),d=Math.hypot(dx,dy);if(d<bd){bd=d;best=el;}}
+  const tw=document.getElementById('r-tablewrap'),tr=tw&&tw.getBoundingClientRect();
+  const inTable=tr&&((x>=tr.left&&x<=tr.right&&y>=tr.top&&y<=tr.bottom)||(cx>=tr.left&&cx<=tr.right&&cy>=tr.top&&cy<=tr.bottom));
+  return inTable||bd<=90?best:null;
+}
 function cleanupDrag(){
   if(!drag)return;if(drag.g)drag.g.remove();if(drag.el)drag.el.classList.remove('lifted');
   document.querySelectorAll('.slot').forEach(s=>s.classList.remove('ok','nope','over'));
@@ -1715,13 +1725,13 @@ document.addEventListener('pointermove',e=>{
     document.querySelectorAll('.slot').forEach(s=>{const ok=!!moveFor(t,s.dataset.side);s.classList.toggle('ok',ok);s.classList.toggle('nope',!ok);s.classList.remove('idle');});
   }
   drag.g.style.transform=`translate(${e.clientX-23}px,${e.clientY-70}px) rotate(-6deg)`;
-  const hit=document.elementFromPoint(e.clientX,e.clientY),s=hit&&hit.closest?hit.closest('.slot'):null;
-  document.querySelectorAll('.slot').forEach(x=>x.classList.toggle('over',x===s&&x.classList.contains('ok')));
+  const s=dropTarget(drag.t,e.clientX,e.clientY);
+  document.querySelectorAll('.slot').forEach(x=>x.classList.toggle('over',x===s));
 });
 document.addEventListener('pointerup',e=>{
   if(!drag||e.pointerId!==drag.id)return;const d=drag;
   if(d.active){
-    const hit=document.elementFromPoint(e.clientX,e.clientY),s=hit&&hit.closest?hit.closest('.slot'):null;
+    const s=dropTarget(d.t,e.clientX,e.clientY);
     const m=s?moveFor(d.t,s.dataset.side):null;cleanupDrag();drag=null;
     if(m){S.locked=true;userPlay(m);}else render();
   }else{drag=null;if(!d.dead)tapTile(d.i);}
