@@ -343,6 +343,11 @@ body.lock{overflow:hidden}
 .capb{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;background:var(--brass);color:#2a1d05;font-size:11px;font-weight:700;font-family:var(--mono)}
 .capbox{margin-top:10px;padding:12px;border-radius:12px;background:rgba(230,180,80,.12);border:1px solid rgba(230,180,80,.6);display:grid;gap:6px}
 .capbox p{margin:0;font-size:14px}
+.sidebox{margin-top:10px;padding:12px;border-radius:12px;background:rgba(236,243,236,.08);border:1px solid rgba(230,180,80,.55);display:grid;gap:10px;text-align:center}
+.sidebox .sides{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.sidebox .sides .btn{padding:12px 8px;font-size:16px}
+.sidebox .sides small{display:block;font-weight:400;font-size:12px;opacity:.8;margin-top:2px}
+.sidebox .cancel{justify-self:center;background:none;border:0;color:var(--muted);text-decoration:underline;padding:4px 8px}
 .school{z-index:32}
 #r-coach:empty{display:none}
 .btn.right:disabled,.btn.wrong:disabled{opacity:1}
@@ -1652,10 +1657,15 @@ function render(){
   }).join('');
   let passbar='';
   if(S.userPassing&&!S.over){const ns=S.L===S.R?[S.L]:[S.L,S.R];passbar=`<div class="passbar" role="status"><div><b>No llevas ${ns.join(' ni ')}.</b> Pasas.</div><button class="btn" data-act="passnow">Pasar ya</button><i style="animation-duration:${Math.round(T(2000))}ms"></i></div>`;}
-  const tip=my&&legalMine.length&&!S.locked?(S.pending&&S.board.length?'Toca la punta donde quieres jugarla':'Arrastra una ficha a una punta, o tócala'):'';
+  let sidebox='';
+  if(S.pending&&!S.locked&&my&&S.board.length){const two=legalMine.filter(m=>m.t===S.pending);
+    if(two.length>1){const bt=m=>{const e=endsAfter(m);return `<button class="btn pri" data-act="slot" data-side="${m.side}">${m.side==='L'?'◀ ':''}Sobre el ${m.side==='L'?S.L:S.R}${m.side==='R'?' ▶':''}<small>quedan ${e[0]} y ${e[1]}</small></button>`;};
+      const L=two.find(m=>m.side==='L'),R=two.find(m=>m.side==='R');
+      sidebox=`<div class="sidebox fx" role="group" aria-label="Elige la punta"><b>¿En qué lado pones el ${fmt(S.pending)}?</b><div class="sides">${bt(L)}${bt(R)}</div><button class="cancel" data-act="cancelpick">Escoger otra ficha</button></div>`;}}
+  const tip=sidebox?'':my&&legalMine.length&&!S.locked?(S.pending&&S.board.length?'Toca la punta donde quieres jugarla':'Arrastra una ficha a una punta, o tócala'):'';
   const capbox=S.choosing&&!S.over?`<div class="capbox fx"><b>Eres capitán. ¿Quién sale?</b><p>${capAdvice(S.hands[0])}</p><div class="mact"><button class="btn" data-act="capchoose" data-who="2">Que salga Memo</button><button class="btn pri" data-act="capchoose" data-who="0">Salgo yo</button></div></div>`:'';
   const handHTML=`<div class="hhead"><span>Tu mano${S.caps&&S.caps.includes(0)?' · capitán':''}</span><span>${S.hands[0].length} ficha${S.hands[0].length===1?'':'s'}</span></div>${fx.pass===0?'<span class="bub" style="top:-6px">¡Paso!</span>':''}
-    <div class="hand" style="--n:${Math.max(1,S.hands[0].length)}">${hand}</div>${capbox}${passbar}${tip?`<p class="handtip">${tip}</p>`:''}`;
+    <div class="hand" style="--n:${Math.max(1,S.hands[0].length)}">${hand}</div>${capbox}${sidebox}${passbar}${tip?`<p class="handtip">${tip}</p>`:''}`;
   const prev={};document.querySelectorAll('#r-hand .ht').forEach(e=>prev[e.dataset.k]=e.getBoundingClientRect());
   if(patch('r-hand',handHTML)&&!reduce&&!fx.deal){
     document.querySelectorAll('#r-hand .ht').forEach(e=>{const r0=prev[e.dataset.k];if(!r0||!e.animate)return;const r1=e.getBoundingClientRect(),dx=r0.left-r1.left,dy=r0.top-r1.top;
@@ -1724,6 +1734,7 @@ document.addEventListener('click',e=>{
   if(a==='slot')slotTap(b.dataset.side);
   else if(a==='ans')answerQuiz(b.dataset.v);
   else if(a==='capchoose')chooseStarter(+b.dataset.who);
+  else if(a==='cancelpick'){S.pending=null;render();}
   else if(a==='menu'){if(S&&!S.showModal&&S.review==null)go('menu');}
   else if(a==='resume'||a==='continue')go('game');
   else if(a==='setup')go('setup','home');
