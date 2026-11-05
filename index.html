@@ -337,6 +337,11 @@ details ul{padding-left:18px;margin:8px 0}
 #fx{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:40}
 body.lock{overflow:hidden}
 #r-net:empty{display:none}
+.instcard{display:grid;grid-template-columns:auto 1fr;gap:10px 12px;align-items:center;padding:12px 14px;border-radius:14px;background:rgba(230,180,80,.12);border:1px solid rgba(230,180,80,.55);animation:slide .35s ease-out}
+.instcard img{width:46px;height:46px;border-radius:11px;box-shadow:0 2px 6px rgba(0,0,0,.35)}
+.instcard b{display:block;font-size:16px} .instcard p{margin:2px 0 0;font-size:13px;color:var(--muted)}
+.instcard .mact{grid-column:1/-1;justify-content:flex-end;margin:0}
+.instcard .shareic{display:inline-block;width:16px;height:16px;vertical-align:-3px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .bottag{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:0 4px}
 .netbar{padding:8px 12px;border-radius:10px;background:rgba(240,138,122,.15);border:1px solid var(--bad);font-size:13.5px;display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}
 .netbar.ok{background:rgba(127,208,168,.12);border-color:rgba(127,208,168,.6)}
@@ -1727,6 +1732,20 @@ const SEG={salida:Object.entries(SALIDAS).map(([k,v])=>[k,v[0]]),level:[['facil'
 const LVHELP={facil:'Juegan sin mucho cálculo y cometen errores.',club:'Cuidan sus números y ahorcan cuando pueden.',maestro:'Simulan repartos y cuentan fichas. Muy difíciles.'};
 const tog=(id,on,label,help)=>`<label class="tog"><input type="checkbox" id="${id}" ${on?'checked':''}><span><b>${label}</b>${help?`<small>${help}</small>`:''}</span></label>`;
 const canContinue=()=>!!S&&!(S.result&&S.result.done);
+/* Instalar como app: Chrome/Android/escritorio usan su ventana de instalación; en iPhone se explica el paso de Safari */
+const INST={evt:null,done:false,dismissed:load('domino100-instalar',0)};
+addEventListener('beforeinstallprompt',e=>{e.preventDefault();INST.evt=e;render();});
+addEventListener('appinstalled',()=>{INST.evt=null;INST.done=true;toast('<b>Listo</b><span>Dominó quedó instalado como app</span>');render();});
+const isStandalone=()=>{try{return matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;}catch(e){return false;}};
+const isIOS=()=>{try{return /iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);}catch(e){return false;}};
+function installCard(){
+  if(isStandalone()||INST.done||!document.querySelector||!document.querySelector('link[rel=manifest]'))return '';
+  if(Date.now()-INST.dismissed<7*864e5)return '';
+  const head=`<img src="apple-touch-icon.png" alt="">`;
+  if(INST.evt)return `<div class="instcard">${head}<div><b>Instala Dominó a 100</b><p>Ábrelo desde tu pantalla de inicio, en pantalla completa y sin internet.</p></div><div class="mact"><button class="btn" data-act="instno">Ahora no</button><button class="btn pri" data-act="install">Instalar app</button></div></div>`;
+  if(isIOS())return `<div class="instcard">${head}<div><b>Instálalo en tu iPhone</b><p>En Safari toca <svg class="shareic" viewBox="0 0 24 24" aria-label="Compartir"><path d="M12 3v12M7.5 7.5 12 3l4.5 4.5"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg> Compartir y luego <b style="display:inline;font-size:13px">Agregar a pantalla de inicio</b>.</p></div><div class="mact"><button class="btn" data-act="instno">Entendido</button></div></div>`;
+  return '';
+}
 function homeHTML(){
   const can=canContinue(),doneN=LESSONS.filter(l=>lessonDone(l.id)).length,achN=ACH.filter(a=>PROG.ach[a[0]]).length,st=PROG.st;
   const fan=[[6,6],[5,3],[1,0]].map((t,i)=>`<span style="--r:${(i-1)*17}deg;--d:${i*110}ms">${tileSVG(t[0],t[1],true)}</span>`).join('');
@@ -1735,6 +1754,7 @@ function homeHTML(){
     <div class="fan" aria-hidden="true">${fan}</div>
     <h1 class="bigsign">Dominó<br>a 100</h1>
     <p class="tagline">Por parejas · pierde quien pase de 100</p>
+    ${installCard()}
     <nav class="mlist" aria-label="Menú principal">
       ${NET.on?item('netback',NET.inGame?'Volver a la mesa':'Volver a la sala',`Mesa ${NET.code} en línea`,'pri'):can?item('continue','Continuar',`Mano ${S.handNo} · Nosotros ${S.scores[0]} · Ellos ${S.scores[1]}`,'pri'):''}
       ${NET.on?'':item('setup','Nueva partida',`Contra bots · rivales ${LVNAME[CFG.level]} · a ${CFG.limit}`,can?'':'pri')}
@@ -1798,6 +1818,7 @@ function settingsHTML(){
       ${tog('colorPips',CFG.colorPips,'Puntos de color','')}
       ${tog('practice',practice,'Ver las fichas de todos','Modo práctica, para entender las jugadas de los demás')}
     </div>
+    ${INST.evt&&!isStandalone()?'<div class="field"><span class="flabel">App</span><button class="btn pri" data-act="install">Instalar app</button></div>':''}
     <div class="field"><span class="flabel">Datos</span>${erase}</div>
   </div>`;
 }
@@ -2021,6 +2042,8 @@ document.addEventListener('click',e=>{
   if(a==='slot')slotTap(b.dataset.side);
   else if(a==='ans')answerQuiz(b.dataset.v);
   else if(a==='capchoose')chooseStarter(+b.dataset.who);
+  else if(a==='install'){const ev=INST.evt;if(!ev)return;ev.prompt();(ev.userChoice||Promise.resolve({})).then(r=>{if(r&&r.outcome==='accepted')INST.done=true;INST.evt=null;render();}).catch(()=>{});}
+  else if(a==='instno'){INST.dismissed=Date.now();store('domino100-instalar',INST.dismissed);render();}
   else if(a==='online'){NET.err='';go('online','home');}
   else if(a==='netcreate'){netConnect(true,rid(4));}
   else if(a==='netjoin'){const c=(NET.codeIn||'').toUpperCase().replace(/[^A-Z0-9]/g,'');if(c.length!==4){NET.err='El código tiene 4 letras o números.';render();}else netConnect(false,c);}
