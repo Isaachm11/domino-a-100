@@ -147,8 +147,8 @@ select{font:inherit;color:var(--ink);background:rgba(0,0,0,.28);border:1px solid
 
 /* Mano */
 .handwrap{position:relative}
-.hand{display:grid;grid-template-columns:repeat(var(--n,7),minmax(0,46px));gap:6px;justify-content:center;min-height:90px;padding-top:12px}
-.ht{width:100%;aspect-ratio:1/2;padding:0;border:0;background:none;border-radius:8px;touch-action:none;transition:transform .18s,opacity .18s,filter .18s}
+.hand{display:flex;gap:6px;justify-content:center;align-items:flex-end;min-height:90px;padding-top:12px}
+.ht{flex:1 1 0;max-width:46px;min-width:0;width:auto;aspect-ratio:1/2;padding:0;border:0;background:none;border-radius:8px;touch-action:none;transition:transform .18s,opacity .18s,filter .18s}
 .ht svg{width:100%;height:100%;display:block;pointer-events:none}
 .ht.ok{transform:translateY(-6px);filter:drop-shadow(0 5px 6px rgba(0,0,0,.45))}
 .ht.ok:hover{transform:translateY(-11px)}
@@ -156,6 +156,11 @@ select{font:inherit;color:var(--ink);background:rgba(0,0,0,.28);border:1px solid
 .ht.hint{outline:3px solid var(--brass);outline-offset:2px}
 .ht.sel{outline:3px solid var(--ink);outline-offset:2px;transform:translateY(-14px)}
 .ht.lifted{opacity:.25}
+.ht.gstart{margin-left:8px}
+.ht.insL{box-shadow:-5px 0 0 -1px var(--brass)}
+.ht.insR{box-shadow:5px 0 0 -1px var(--brass)}
+.sortbtn{border:1px solid var(--line);background:rgba(0,0,0,.22);border-radius:99px;padding:3px 10px;font-size:12.5px;color:var(--ink)}
+.sortbtn b{color:var(--brass);font-weight:700}
 .ht.shake{animation:shake .35s}
 @keyframes shake{25%{transform:translateX(-5px)}50%{transform:translateX(5px)}75%{transform:translateX(-3px)}}
 .ht.deal{animation:deal .55s cubic-bezier(.2,1.2,.4,1) both}
@@ -572,7 +577,7 @@ function newHand(){
   clearTimeout(S.timer);
   const d=shuffle(allTiles());
   S.hands=[0,1,2,3].map(i=>d.slice(i*7,i*7+7).sort((x,y)=>(x[0]-y[0])||(x[1]-y[1])));
-  resetHand();if(NET.inGame){NET.applied=0;NET.acts=[];}
+  resetHand();arrangeHand();if(NET.inGame){NET.applied=0;NET.acts=[];}
   S.handNo++;S.choosing=false;let capBy=null;
   const prevStarter=S.handStarter,h66=S.hands.findIndex(h=>h.some(t=>t[0]===6&&t[1]===6)),mode=S.salida||'ganador';
   let msg;
@@ -593,6 +598,19 @@ function newHand(){
   UNDO=[];HANDSTART=NET.inGame?null:serialize();
   if(NET.inGame)netBroadcastDeal(capBy);
   nextTurn(S.starter===0?0:700);
+}
+/* Acomodo de tu mano: por palo (tu número más largo primero, con la mula al frente), por número, por puntos o libre */
+const SORTS={palo:'por palo',numero:'por número',puntos:'por puntos',libre:'libre'};
+function flipTo(t,top){if(t[0]!==top&&t[1]===top){const x=t[0];t[0]=t[1];t[1]=x;}}
+function arrangeHand(){
+  if(!S||!S.hands||!S.hands[0]||!S.hands[0].length)return;const mode=CFG.handSort||'palo';if(mode==='libre')return;
+  const h=S.hands[0],c=suitCounts(h);let out;
+  if(mode==='numero'){h.forEach(t=>flipTo(t,Math.min(t[0],t[1])));out=h.slice().sort((a,b)=>(a[0]-b[0])||(a[1]-b[1]));}
+  else if(mode==='puntos'){h.forEach(t=>flipTo(t,Math.max(t[0],t[1])));out=h.slice().sort((a,b)=>(pips(b)-pips(a))||(b[0]-a[0]));}
+  else{const rank=[0,1,2,3,4,5,6].sort((a,b)=>(c[b]-c[a])||(b-a)),r=v=>rank.indexOf(v);
+    h.forEach(t=>flipTo(t,r(t[0])<=r(t[1])?t[0]:t[1]));
+    out=h.slice().sort((a,b)=>(r(a[0])-r(b[0]))||((b[0]===b[1])-(a[0]===a[1]))||(r(a[1])-r(b[1])));}
+  S.hands[0]=out;
 }
 function suitCounts(h){const c=[0,0,0,0,0,0,0];for(const t of h){c[t[0]]++;if(t[1]!==t[0])c[t[1]]++;}return c;}
 function capWantsSelf(h){const k=handType(h).k;if(k==='malo')return false;if(k==='bueno')return true;const c=suitCounts(h),m=Math.max(...c),n=c.indexOf(m);return m>=4||(m===3&&h.some(t=>t[0]===n&&t[1]===n));}
@@ -1160,7 +1178,7 @@ function startHandFromDeal(d){
   NET.q=NET.q.filter(x=>x.mid===NET.mid&&x.h>=d.h);
   const my=NET.mySeat,loc=arr=>[0,1].map(t=>arr[(t+my)%2]);
   S.hands=[0,1,2,3].map(l=>d.hands[netA(l)].map(t=>[t[0],t[1]]).sort((x,y)=>(x[0]-y[0])||(x[1]-y[1])));
-  resetHand();S.handNo=d.h;S.salida=d.salida;S.scores=loc(d.scores);S.tally=loc(d.tally).map(x=>x.slice());S.prevScores=loc(d.prev);
+  resetHand();arrangeHand();S.handNo=d.h;S.salida=d.salida;S.scores=loc(d.scores);S.tally=loc(d.tally).map(x=>x.slice());S.prevScores=loc(d.prev);
   S.caps=d.caps?[0,1].map(t=>netL(d.caps[(t+my)%2])):null;S.open66=!!d.open66;
   S.starter=d.starter==null?null:netL(d.starter);S.choosing=d.chooser!=null;S.chooser=d.chooser==null?null:netL(d.chooser);
   S.turn=S.choosing?null:S.starter;S.handStarter=S.starter;
@@ -1953,10 +1971,12 @@ function render(){
   patch('r-call',fx.call?`<div class="rotulo ${fx.call.k}">${fx.call.txt}</div>`:'');
   if(fx.slam){const tw=document.getElementById('r-tablewrap');tw.classList.remove('slam');void tw.offsetWidth;tw.classList.add('slam');}
   // Mano: las fichas que se quedan se deslizan a su nuevo lugar
-  const hand=S.hands[0].map((t,i)=>{
+  const smode=CFG.handSort||'palo';
+  const hand=S.hands[0].map((t,i,arr)=>{
     let cls=my&&!S.locked?(legalSet.has(t)?'ok':'no'):'';
+    if((smode==='palo'||smode==='numero')&&i>0&&t[0]!==arr[i-1][0])cls+=' gstart';
     if(S.hint===t)cls+=' hint';if(S.pending===t)cls+=' sel';if(fx.shake===i)cls+=' shake';if(fx.deal)cls+=' deal';
-    return `<button class="ht ${cls}" data-act="tile" data-i="${i}" data-k="${t[0]}-${t[1]}" aria-label="Ficha ${t[0]} y ${t[1]}" ${fx.deal?`style="animation-delay:${i*70}ms"`:''}>${tileSVG(t[0],t[1],true)}</button>`;
+    return `<button class="ht ${cls}" data-act="tile" data-i="${i}" data-k="${Math.min(t[0],t[1])}-${Math.max(t[0],t[1])}" aria-label="Ficha ${t[0]} y ${t[1]}" ${fx.deal?`style="animation-delay:${i*70}ms"`:''}>${tileSVG(t[0],t[1],true)}</button>`;
   }).join('');
   let passbar='';
   if(S.userPassing&&!S.over){const ns=S.L===S.R?[S.L]:[S.L,S.R];passbar=`<div class="passbar" role="status"><div><b>No llevas ${ns.join(' ni ')}.</b> Pasas.</div><button class="btn" data-act="passnow">Pasar ya</button><i style="animation-duration:${Math.round(T(2000))}ms"></i></div>`;}
@@ -1965,9 +1985,9 @@ function render(){
     if(two.length>1){const bt=m=>{const e=endsAfter(m);return `<button class="btn pri" data-act="slot" data-side="${m.side}">${m.side==='L'?'◀ ':''}Sobre el ${m.side==='L'?S.L:S.R}${m.side==='R'?' ▶':''}<small>quedan ${e[0]} y ${e[1]}</small></button>`;};
       const L=two.find(m=>m.side==='L'),R=two.find(m=>m.side==='R');
       sidebox=`<div class="sidebox fx" role="group" aria-label="Elige la punta"><b>¿En qué lado pones el ${fmt(S.pending)}?</b><div class="sides">${bt(L)}${bt(R)}</div><button class="cancel" data-act="cancelpick">Escoger otra ficha</button></div>`;}}
-  const tip=sidebox?'':my&&legalMine.length&&!S.locked?(S.pending&&S.board.length?'Toca la punta donde quieres jugarla':'Arrastra una ficha a una punta, o tócala'):'';
+  const tip=sidebox?'':my&&legalMine.length&&!S.locked?(S.pending&&S.board.length?'Toca la punta donde quieres jugarla':'Arrastra una ficha a una punta, o tócala. Arrástrala dentro de tu mano para reacomodarla.'):'';
   const capbox=S.choosing&&!S.over&&(S.chooser===0||S.chooser==null)&&ctrlOf(0)==='me'?`<div class="capbox fx"><b>Eres capitán. ¿Quién sale?</b><p>${capAdvice(S.hands[0])}</p><div class="mact"><button class="btn" data-act="capchoose" data-who="2">Que salga ${NAMES[2]}</button><button class="btn pri" data-act="capchoose" data-who="0">Salgo yo</button></div></div>`:'';
-  const handHTML=`<div class="hhead"><span>Tu mano${S.caps&&S.caps.includes(0)?' · capitán':''}</span><span>${S.hands[0].length} ficha${S.hands[0].length===1?'':'s'}</span></div>${fx.pass===0?'<span class="bub" style="top:-6px">¡Paso!</span>':''}
+  const handHTML=`<div class="hhead"><span>Tu mano${S.caps&&S.caps.includes(0)?' · capitán':''}</span><button class="sortbtn" data-act="sortcycle" aria-label="Cambiar el orden de tu mano">Orden: <b>${SORTS[smode]}</b></button></div>${fx.pass===0?'<span class="bub" style="top:-6px">¡Paso!</span>':''}
     <div class="hand" style="--n:${Math.max(1,S.hands[0].length)}">${hand}</div>${capbox}${sidebox}${passbar}${tip?`<p class="handtip">${tip}</p>`:''}`;
   const prev={};document.querySelectorAll('#r-hand .ht').forEach(e=>prev[e.dataset.k]=e.getBoundingClientRect());
   if(patch('r-hand',handHTML)&&!reduce&&!fx.deal){
@@ -2009,6 +2029,7 @@ function dropTarget(t,x,y){
   return inTable||bd<=90?best:null;
 }
 function cleanupDrag(){
+  document.querySelectorAll('#r-hand .ht').forEach(x=>x.classList.remove('insL','insR'));
   if(!drag)return;if(drag.g)drag.g.remove();if(drag.el)drag.el.classList.remove('lifted');
   document.querySelectorAll('.slot').forEach(s=>s.classList.remove('ok','nope','over'));
 }
@@ -2021,20 +2042,36 @@ document.addEventListener('pointermove',e=>{
   if(!drag.active){
     if(Math.hypot(e.clientX-drag.x0,e.clientY-drag.y0)<10)return;
     const t=S.hands[0][drag.i];
-    if(S.turn!==0||S.over||S.locked||SCH||ctrlOf(0)!=='me'||!legal(0).some(m=>m.t===t)){drag.dead=true;return;}
-    drag.active=true;drag.t=t;S.pending=null;
+    if(!t||SCH||APP.view!=='game'){drag.dead=true;return;}
+    drag.play=S.turn===0&&!S.over&&!S.locked&&ctrlOf(0)==='me'&&legal(0).some(m=>m.t===t);
+    drag.active=true;drag.t=t;if(drag.play)S.pending=null;
     const g=document.createElement('div');g.className='ghost';g.innerHTML=tileSVG(t[0],t[1],true);document.body.appendChild(g);drag.g=g;
     drag.el.classList.add('lifted');drag.el.classList.remove('sel');
-    document.querySelectorAll('.slot').forEach(s=>{const ok=!!moveFor(t,s.dataset.side);s.classList.toggle('ok',ok);s.classList.toggle('nope',!ok);s.classList.remove('idle');});
+    if(drag.play)document.querySelectorAll('.slot').forEach(s=>{const ok=!!moveFor(t,s.dataset.side);s.classList.toggle('ok',ok);s.classList.toggle('nope',!ok);s.classList.remove('idle');});
   }
   drag.g.style.transform=`translate(${e.clientX-23}px,${e.clientY-70}px) rotate(-6deg)`;
-  const s=dropTarget(drag.t,e.clientX,e.clientY);
+  const ins=handInsert(e.clientX,e.clientY);
+  document.querySelectorAll('#r-hand .ht').forEach(x=>x.classList.remove('insL','insR'));
+  if(ins){if(ins.el)ins.el.classList.add(ins.side);document.querySelectorAll('.slot').forEach(x=>x.classList.remove('over'));return;}
+  const s=drag.play?dropTarget(drag.t,e.clientX,e.clientY):null;
   document.querySelectorAll('.slot').forEach(x=>x.classList.toggle('over',x===s));
 });
+/* Posición dentro de tu mano donde caería la ficha al reacomodar */
+function handInsert(x,y){
+  const hw=document.getElementById('r-hand');if(!hw||!drag)return null;const r=hw.getBoundingClientRect();
+  if(y<r.top-10||y>r.bottom+40||x<r.left-20||x>r.right+20)return null;
+  const tiles=[...hw.querySelectorAll('.ht')].filter(el=>+el.dataset.i!==drag.i);
+  let idx=tiles.length;for(let k=0;k<tiles.length;k++){const b=tiles[k].getBoundingClientRect();if(x<b.left+b.width/2){idx=k;break;}}
+  return{idx,el:idx<tiles.length?tiles[idx]:tiles[tiles.length-1],side:idx<tiles.length?'insL':'insR'};
+}
 document.addEventListener('pointerup',e=>{
   if(!drag||e.pointerId!==drag.id)return;const d=drag;
   if(d.active){
-    const s=dropTarget(d.t,e.clientX,e.clientY);
+    const ins=handInsert(e.clientX,e.clientY);
+    if(ins){cleanupDrag();drag=null;document.querySelectorAll('#r-hand .ht').forEach(x=>x.classList.remove('insL','insR'));
+      const h=S.hands[0],t=h[d.i],rest=h.filter((_,k)=>k!==d.i);rest.splice(ins.idx,0,t);
+      if(rest.some((x,k)=>x!==h[k])){S.hands[0]=rest;CFG.handSort='libre';saveCfg();}render();return;}
+    const s=d.play?dropTarget(d.t,e.clientX,e.clientY):null;
     const m=s?moveFor(d.t,s.dataset.side):null;cleanupDrag();drag=null;
     if(m){S.locked=true;userPlay(m);}else render();
   }else{drag=null;if(!d.dead)tapTile(d.i);}
@@ -2047,6 +2084,7 @@ document.addEventListener('click',e=>{
   if(a==='slot')slotTap(b.dataset.side);
   else if(a==='ans')answerQuiz(b.dataset.v);
   else if(a==='capchoose')chooseStarter(+b.dataset.who);
+  else if(a==='sortcycle'){const order=['palo','numero','puntos'],cur=CFG.handSort||'palo';CFG.handSort=order[(order.indexOf(cur)+1)%order.length];saveCfg();arrangeHand();render();}
   else if(a==='install'){const ev=INST.evt;if(!ev)return;ev.prompt();(ev.userChoice||Promise.resolve({})).then(r=>{if(r&&r.outcome==='accepted')INST.done=true;INST.evt=null;render();}).catch(()=>{});}
   else if(a==='instno'){INST.dismissed=Date.now();store('domino100-instalar',INST.dismissed);render();}
   else if(a==='online'){NET.err='';go('online','home');}
